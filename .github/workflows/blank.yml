@@ -1,0 +1,58 @@
+name: Databricks CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      DEV_REPO_PATH: "/Workspace/Users/devangbajpai7@gmail.com/CI-CD-DataLemur-Hard-Pyspark-Dev"
+      PROD_REPO_PATH: "/Workspace/Users/devangbajpai7@gmail.com/CI-CD-DataLemur-Hard-Pyspark-Prod"
+      DATABRICKS_HOST: ${{ secrets.DEVELOPMENT_URL }}
+      DATABRICKS_TOKEN: ${{ secrets.DEVELOPMENT_TOKEN }}
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Install Databricks CLI
+      - name: Install Databricks CLI
+        run: pip install databricks-cli
+
+      # Step 3: Configure Databricks CLI authentication
+      - name: Configure Databricks CLI
+        run: |
+          mkdir -p ~/.databricks
+          cat > ~/.databrickscfg <<EOF
+          [DEFAULT]
+          host = $DATABRICKS_HOST
+          token = $DATABRICKS_TOKEN
+          EOF
+      # Step 4: Debug to check secrets
+      - name: Debug secrets
+        run: |
+          if [ -z "$DATABRICKS_HOST" ] || [ -z "$DATABRICKS_TOKEN" ]; then
+            echo "❌ Databricks secrets are missing!"
+            exit 1
+          else
+            echo "✅ Databricks secrets are loaded."
+          fi
+      # Step 5: Deploy to Databricks Workspace
+      - name: Deploy to Databricks Workspace
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          if [ "$BRANCH" = "dev" ]; then
+            echo "🚀 Deploying to DEV Workspace..."
+            databricks workspace import_dir . "${DEV_REPO_PATH}" --overwrite
+          elif [ "$BRANCH" = "main" ]; then
+            echo "🚀 Deploying to PROD Workspace..."
+            databricks workspace import_dir . "${PROD_REPO_PATH}" --overwrite
+          else
+            echo "⚠️ Branch is neither dev nor main. Skipping deployment."
+          fi
